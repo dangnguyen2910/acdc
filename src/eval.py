@@ -52,13 +52,13 @@ with torch.no_grad():
         output = torch.argmax(torch.softmax(output, dim=1), dim=1, keepdim=True)
 
         # print(np.unique(output.cpu().numpy()))
-        for j in range(10): 
-            fig, ax = plt.subplots(1,3)
-            ax[0].imshow(img.squeeze().permute(1,2,0).cpu().numpy()[:,:,j], 'gray')
-            ax[1].imshow(gt.squeeze().permute(1,2,0).cpu().numpy()[:,:,j])
-            ax[2].imshow(output.squeeze().permute(1,2,0).cpu().numpy()[:,:,j])
-            plt.show()
-            plt.close()
+        # for j in range(10): 
+        #     fig, ax = plt.subplots(1,3)
+        #     ax[0].imshow(img.squeeze().permute(1,2,0).cpu().numpy()[:,:,j], 'gray')
+        #     ax[1].imshow(gt.squeeze().permute(1,2,0).cpu().numpy()[:,:,j])
+        #     ax[2].imshow(output.squeeze().permute(1,2,0).cpu().numpy()[:,:,j])
+        #     plt.show()
+        #     plt.close()
 
         dice_scores = dice_coefficient(output, gt, 4)
         class0, class1, class2, class3 = dice_scores

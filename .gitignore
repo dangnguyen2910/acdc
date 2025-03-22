@@ -2,3 +2,4 @@ database
 *.pth
 __pycache__
 nohup.out
+processed/

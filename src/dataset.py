@@ -1,14 +1,18 @@
 import numpy as np 
 import pandas as pd
+import warnings
 import matplotlib.pyplot as plt
 from torch.utils.data import Dataset
 import torchvision.transforms.v2 as v2
 import torchio as tio
 import torch
 import nibabel as nib
+import SimpleITK as sitk
 import os
 
 from src.model.model import UNet3D
+
+warnings.filterwarnings("ignore")
 
 class ACDC(Dataset): 
     def __init__(self, data_path):
@@ -32,13 +36,19 @@ class ACDC(Dataset):
         img_path = self.df.iloc[index, 0]
         gt_path = self.df.iloc[index, 1]
         
-        img = self.load_nifti_image(img_path)
-        gt = self.load_nifti_image(gt_path)
+        # img = self.load_nifti_image(img_path)
+        # gt = self.load_nifti_image(gt_path)
 
-        img = torch.tensor(img).permute(2,0,1).unsqueeze(0)
+        img = self.resample_3d_image(img_path)
+        gt = self.resample_3d_image(gt_path)
+
+        img = sitk.GetArrayFromImage(img)
+        gt = sitk.GetArrayFromImage(gt)
+
+        img = torch.tensor(img).unsqueeze(0)
         img = self.transform(img)
         
-        gt = torch.tensor(gt).permute(2,0,1).unsqueeze(0)
+        gt = torch.tensor(gt).unsqueeze(0)
         gt = self.gt_transform(gt).to(torch.long)
         
         return img, gt
@@ -111,6 +121,7 @@ class ACDC(Dataset):
         })
         return df
 
+
     def extract_code(self, path): 
         info = pd.read_csv(path, header = None, delimiter=":")
         ed_frameId = (int(info.iloc[0,1]))
@@ -119,35 +130,66 @@ class ACDC(Dataset):
         return ed_frameId, es_frame_Id
 
 
+    def resample_3d_image(self, image_path, new_spacing=(1.25, 1.25, 10.0), interpolator=sitk.sitkLinear):
+        # Load image
+        image = sitk.ReadImage(image_path)
+
+        # Get original spacing and size
+        original_spacing = image.GetSpacing()
+        original_size = image.GetSize()
+
+        # Compute new size to preserve field of view
+        new_size = [
+            int(round(original_size[i] * (original_spacing[i] / new_spacing[i])))
+            for i in range(3)
+        ]
+
+        # Define resampling filter
+        resampler = sitk.ResampleImageFilter()
+        resampler.SetOutputSpacing(new_spacing)
+        resampler.SetSize(new_size)
+        resampler.SetInterpolator(interpolator)
+        resampler.SetOutputOrigin(image.GetOrigin())
+        resampler.SetOutputDirection(image.GetDirection())
+
+        # Apply resampling
+        resampled_image = resampler.Execute(image)
+        
+        return resampled_image
 
 # For testing only
 if __name__ == "__main__": 
     dataset = ACDC("database/training")
-    model = UNet3D(1,4,is_segmentation=False)
+    # model = UNet3D(1,4,is_segmentation=False)
     loss_fn = torch.nn.CrossEntropyLoss()
     
     print("Data size:", len(dataset))
     # ed, ed_gt, es, es_gt = dataset[0]
-    img, gt = dataset[9]
+    for i in range(len(dataset)):
+        print("New image")
+        img, gt = dataset[i]
 
-    img = img.unsqueeze(0)
-    gt = gt.unsqueeze(0).squeeze(1)
-    
-    with torch.no_grad(): 
-        output = model(img)
+        img = img.unsqueeze(0)
+        gt = gt.unsqueeze(0).squeeze(1)
+        
+        # with torch.no_grad(): 
+        #     output = model(img)
 
-    print("Image shape:", img.size())
-    print("GT shape:", gt.size())
-    print("Output shape:", output.size())
+        print("Image shape:", img.size())
+        print("GT shape:", gt.size())
+        # print("Output shape:", output.size())
 
-    loss = loss_fn(output, gt)
-    print("Loss:", loss.item())
+        # loss = loss_fn(output, gt)
+        # print("Loss:", loss.item())
 
-    img = img.squeeze().permute(1,2,0).cpu()[:,:,0]
-    # output = output.squeeze().permute(1,2,0).detach().numpy()[:,:,0]
-    gt = gt.squeeze().permute(1,2,0).cpu()[:,:,0]
+        for j in range(img.shape[2]):
+            print(f"Layer {j}")
+            img_tmp = img.squeeze().permute(1,2,0).cpu()[:,:,j]
+            # output = output.squeeze().permute(1,2,0).detach().numpy()[:,:,0]
+            gt_tmp = gt.squeeze().permute(1,2,0).cpu()[:,:,j]
 
-    # fig, ax = plt.subplots(1,2)
-    # ax[0].imshow(img, 'gray')
-    # ax[1].imshow(gt)
-    # plt.show()
+            fig, ax = plt.subplots(1,2)
+            ax[0].imshow(img_tmp, 'gray')
+            ax[1].imshow(gt_tmp)
+            plt.show()
+            plt.close()

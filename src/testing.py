@@ -1,3 +1,5 @@
+import numpy as np 
+import matplotlib.pyplot as plt
 import torchio as tio
 import nibabel as nib
 import SimpleITK as sitk
@@ -83,8 +85,11 @@ def resample_3d_image(image_path, new_spacing=(1.25, 1.25, 10.0), interpolator=s
     return resampled_image
 
 df = make_dataframe()
-img = resample_3d_image(df.iloc[0,1])
+img = resample_3d_image(df.iloc[0,0])
 print(img.GetSpacing())
-print(sitk.GetArrayFromImage(img).shape)
+img = sitk.GetArrayFromImage(img)
+print(img.shape)
+plt.imshow(np.transpose(img, (1,2,0))[:,:,0], 'gray')
+plt.show()
 # gt = load_nifti_image(df[0,1])
 
