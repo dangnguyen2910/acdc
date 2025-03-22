@@ -1,0 +1,3 @@
+database
+*.pth
+__pycache__
