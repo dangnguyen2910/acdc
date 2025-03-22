@@ -45,7 +45,7 @@ def train(rank, world_size):
     #     if (rank == 0): 
     #         print(f"Fold {fold+1}/5")
 
-    model = UNet3D(in_channels=1, out_channels=5).to(rank)
+    model = UNet3D(in_channels=1, out_channels=4, is_segmentation=False).to(rank)
     model = DDP(model, device_ids=[rank])
 
     loss_fn = nn.CrossEntropyLoss()
