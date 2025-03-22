@@ -1,4 +1,6 @@
 import torchio as tio
+import nibabel as nib
+import SimpleITK as sitk
 import pandas as pd 
 import os
 
@@ -48,27 +50,41 @@ def make_dataframe():
     })
     return df
 
+def load_nifti_image(file_path):
+    img = nib.load(file_path)
+    data = img.get_fdata()
+    return data
+
+def resample_3d_image(image_path, new_spacing=(1.25, 1.25, 10.0), interpolator=sitk.sitkLinear):
+    # Load image
+    image = sitk.ReadImage(image_path)
+
+    # Get original spacing and size
+    original_spacing = image.GetSpacing()
+    original_size = image.GetSize()
+
+    # Compute new size to preserve field of view
+    new_size = [
+        int(round(original_size[i] * (original_spacing[i] / new_spacing[i])))
+        for i in range(3)
+    ]
+
+    # Define resampling filter
+    resampler = sitk.ResampleImageFilter()
+    resampler.SetOutputSpacing(new_spacing)
+    resampler.SetSize(new_size)
+    resampler.SetInterpolator(interpolator)
+    resampler.SetOutputOrigin(image.GetOrigin())
+    resampler.SetOutputDirection(image.GetDirection())
+
+    # Apply resampling
+    resampled_image = resampler.Execute(image)
+    
+    return resampled_image
+
 df = make_dataframe()
+img = resample_3d_image(df.iloc[0,1])
+print(img.GetSpacing())
+print(sitk.GetArrayFromImage(img).shape)
+# gt = load_nifti_image(df[0,1])
 
-subjects = [
-    tio.Subject(
-        image = tio.ScalarImage(df.iloc[i,0]), 
-        gt = tio.LabelMap(df.iloc[i,1])
-    )
-    for i in range(df.shape[0])
-]
-
-print(len(subjects))
-dataset = tio.SubjectsDataset(subjects)
-loader = tio.SubjectsLoader(
-    dataset, 
-    batch_size = 1, 
-    shuffle = True
-)
-
-for data in loader: 
-    print(type(data))
-    inputs = data['image'][tio.DATA]
-    gt = data['gt'][tio.DATA]
-
-    print(inputs.size())
