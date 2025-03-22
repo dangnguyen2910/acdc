@@ -16,6 +16,9 @@ import torchvision.transforms.v2 as v2
 from src.model.model import UNet3D
 from src.dataset import ACDC
 
+def print_vram(): 
+    print(f"Allocated: {torch.cuda.memory_allocated()/1e6} MB")
+    print(f"Reserved: {torch.cuda.memory_reserved()/1e6} MB")
 
 def setup(rank, world_size): 
     os.environ["MASTER_ADDR"] = "localhost"
@@ -54,14 +57,17 @@ def train(rank, world_size):
     # train_subset = Subset(dataset, train_idx)
     # val_subset = Subset(dataset, val_idx)
 
-    train_dataloader = DataLoader(train_dataset, 
-                                    batch_size=batch_size, 
-                                    shuffle=False, 
-                                    sampler=DistributedSampler(train_dataset))
+    train_dataloader = DataLoader(
+        train_dataset, 
+        batch_size=batch_size, 
+        shuffle=False, 
+        num_workers = 2,
+        sampler=DistributedSampler(train_dataset))
     valid_dataloader = DataLoader(valid_dataset, 
-                                    batch_size=batch_size, 
-                                    shuffle=False, 
-                                    sampler=DistributedSampler(valid_dataset))
+        batch_size=batch_size, 
+        shuffle=False, 
+        num_workers = 2,
+        sampler=DistributedSampler(valid_dataset))
 
     train_loss = []
     val_loss = []
@@ -75,6 +81,9 @@ def train(rank, world_size):
 
         train_dataloader.sampler.set_epoch(epoch)
         valid_dataloader.sampler.set_epoch(epoch)
+
+        if (rank == 0):
+            print_vram()
 
         model.train()
         loss = train_one_epoch(rank, model, train_dataloader, loss_fn, optimizer)
@@ -123,16 +132,19 @@ def train_one_epoch(rank, model, train_dataloader, loss_fn, optimizer):
 
         img = img.to(rank)
         gt = gt.squeeze(1).to(rank)
-        
+
         optimizer.zero_grad(set_to_none = True)
         output = model(img)
         loss = loss_fn(output, gt)
         loss.backward()
         optimizer.step() 
-        
+
         running_loss += loss.item()
         if (i % 10 == 9 and rank == 0): 
             print(f"[{i+1}/{len(train_dataloader)}]")
+
+        del loss, output
+        torch.cuda.empty_cache()
 
     return running_loss/len(train_dataloader)
 
