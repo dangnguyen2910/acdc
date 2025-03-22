@@ -97,6 +97,7 @@ def train(rank, world_size):
                 model_path = "model/unet3d.pth"
 
                 torch.save(model.module.state_dict(), model_path)
+                torch.cuda.empty_cache()
                 print(f"Save model to {model_path} in process {rank}")
 
     # fold_results.append(min_loss)
