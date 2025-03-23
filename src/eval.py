@@ -32,7 +32,7 @@ state_dict = torch.load("model/unet3d.pth")
 
 model.load_state_dict(state_dict)
 
-test_dataset = ACDCProcessed("processed/testing")
+test_dataset = ACDCProcessed("processed/testing", is_testset=True)
 test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
 dices = []

@@ -17,7 +17,7 @@ from src.model.model import UNet3D
 from src.dataset import ACDC, ACDCProcessed
 from src.loss import DiceLoss3D
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,1"
 
 
 def print_vram(): 
@@ -39,18 +39,10 @@ def train(rank, world_size):
     setup(rank, world_size)
 
     batch_size = 1
-    EPOCHS = 50
-    
-    # kf = KFold(n_splits=5, shuffle=True, random_state=42)
-    # fold_results = []
+    EPOCHS = 40
 
     train_dataset = ACDCProcessed("processed/training/", is_testset=False)
     valid_dataset = ACDCProcessed("processed/valid/", is_testset=True)
-    # global_min_loss = 9999
-
-    # for fold, (train_idx, val_idx) in enumerate(kf.split(dataset)): 
-    #     if (rank == 0): 
-    #         print(f"Fold {fold+1}/5")
 
     model = UNet3D(in_channels=1, out_channels=4, is_segmentation=False).to(rank)
     model = DDP(model, device_ids=[rank])
@@ -58,21 +50,19 @@ def train(rank, world_size):
     loss_fn = DiceLoss3D()
     optimizer = torch.optim.Adam(model.parameters(), lr = 0.0001, foreach=True)
 
-    # train_subset = Subset(dataset, train_idx)
-    # val_subset = Subset(dataset, val_idx)
+    train_sampler = DistributedSampler(train_dataset, shuffle=True)
+    val_sampler = DistributedSampler(valid_dataset, shuffle=False)
 
     train_dataloader = DataLoader(
         train_dataset, 
         batch_size=batch_size, 
-        shuffle=False, 
         num_workers = 2,
-        sampler=DistributedSampler(train_dataset)
+        sampler=train_sampler
     )
     valid_dataloader = DataLoader(valid_dataset, 
         batch_size=batch_size, 
-        shuffle=False, 
         num_workers = 2,
-        sampler=DistributedSampler(valid_dataset)
+        sampler=val_sampler
     )
 
     train_loss = []
@@ -82,14 +72,12 @@ def train(rank, world_size):
     # Start training
     for epoch in range(EPOCHS): 
         if (rank == 0): 
+            start = time.time()
             print("-" * 50)
             print(f"Epoch [{epoch+1}/{EPOCHS}]: ")
 
-        # train_dataloader.sampler.set_epoch(epoch)
+        train_sampler.set_epoch(epoch)
         # valid_dataloader.sampler.set_epoch(epoch)
-
-        if (rank == 0):
-            print_vram()
 
         model.train()
         loss = train_one_epoch(rank, model, train_dataloader, loss_fn, optimizer)
@@ -115,7 +103,10 @@ def train(rank, world_size):
                 torch.cuda.empty_cache()
                 print(f"Save model to {model_path} in process {rank}")
 
-    # fold_results.append(min_loss)
+            end = time.time()
+            elapsed = (end - start)/60
+            print(f"Time: {elapsed:3f} minutes")
+
     df = pd.DataFrame({
         "train_loss": train_loss, 
         "val_loss": val_loss
@@ -124,10 +115,6 @@ def train(rank, world_size):
     # del model, loss_fn, optimizer, train_dataloader, valid_dataloader
     # torch.cuda.empty_cache()
     # gc.collect()
-
-    # if (rank == 0): 
-    #     with open("train_result.txt", "w") as f: 
-    #         f.write(f"Best model: {np.argmax(fold_results) + 1}")
 
 
 def train_one_epoch(rank, model, train_dataloader, loss_fn, optimizer): 
@@ -148,6 +135,7 @@ def train_one_epoch(rank, model, train_dataloader, loss_fn, optimizer):
         running_loss += loss.item()
         if (i % 10 == 9 and rank == 0): 
             print(f"[{i+1}/{len(train_dataloader)}]")
+            print_vram()
 
         del loss, output, img, gt
         torch.cuda.empty_cache()
