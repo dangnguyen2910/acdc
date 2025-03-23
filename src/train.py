@@ -15,6 +15,7 @@ import torchvision.transforms.v2 as v2
 
 from src.model.model import UNet3D
 from src.dataset import ACDC
+from src.loss import DiceLoss3D
 
 def print_vram(): 
     print(f"Allocated: {torch.cuda.memory_allocated()/1e6} MB")
@@ -114,7 +115,7 @@ def train(rank, world_size):
         "train_loss": train_loss, 
         "val_loss": val_loss
     })
-    df.to_csv(f"train_result.csv")
+    df.to_csv(f"train_result.csv", index = False)
     # del model, loss_fn, optimizer, train_dataloader, valid_dataloader
     # torch.cuda.empty_cache()
     # gc.collect()
