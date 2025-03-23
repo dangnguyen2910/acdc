@@ -10,8 +10,6 @@ import nibabel as nib
 import SimpleITK as sitk
 import os
 
-from src.model.model import UNet3D
-
 warnings.filterwarnings("ignore")
 
 class ACDC(Dataset): 
@@ -36,9 +34,6 @@ class ACDC(Dataset):
         img_path = self.df.iloc[index, 0]
         gt_path = self.df.iloc[index, 1]
         
-        # img = self.load_nifti_image(img_path)
-        # gt = self.load_nifti_image(gt_path)
-
         img = self.resample_3d_image(img_path)
         gt = self.resample_3d_image(gt_path)
 
@@ -53,26 +48,6 @@ class ACDC(Dataset):
         
         return img, gt
 
-    # def __getitem__(self, index): 
-        '''
-        An alternative version if you want to separate ed and es
-        '''
-         # patient_folder_path = self.patient_folders[index]
-        # files = [os.path.join(patient_folder_path, file) for file in os.listdir(patient_folder_path)]
-
-        # # ED, ES, gt_ED, gt_ES
-        # ed_path = next((file for file in files if "frame01" in file and "gt" not in file), None)
-        # es_path = next((file for file in files if "frame01" not in file and "frame" in file and "gt" not in file), None)
-
-        # ed_gt_path = next((file for file in files if "frame01" in file and "gt" in file), None)
-        # es_gt_path = next((file for file in files if "frame01" not in file and "frame" in file and "gt" in file), None)
-
-        # ed = self.load_nifti_image(ed_path)
-        # es = self.load_nifti_image(es_path)
-        # ed_gt = self.load_nifti_image(ed_gt_path)
-        # es_gt = self.load_nifti_image(es_gt_path)
-
-        # return (ed, ed_gt, es, es_gt)
 
     def __len__(self): 
         return self.df.shape[0]
@@ -82,6 +57,7 @@ class ACDC(Dataset):
         img = nib.load(file_path)
         data = img.get_fdata()
         return data
+
 
     def make_dataframe(self): 
         '''
@@ -159,6 +135,29 @@ class ACDC(Dataset):
 
         
 class ACDCProcessed(ACDC): 
+    def __init__(self, data_path, is_testset): 
+        self.is_testset = is_testset
+        super().__init__(data_path)
+
+    def __getitem__(self, index):
+        img_path = self.df.iloc[index, 0]
+        gt_path = self.df.iloc[index, 1]
+        
+        img = sitk.ReadImage(img_path)
+        gt = sitk.ReadImage(gt_path)
+        
+        img = sitk.GetArrayFromImage(img)
+        gt = sitk.GetArrayFromImage(gt)
+
+        img = torch.tensor(img).unsqueeze(0)
+        img = self.transform(img)
+        
+        gt = torch.tensor(gt).unsqueeze(0)
+        gt = self.gt_transform(gt).to(torch.long)
+        
+        return img, gt
+
+
     def make_dataframe(self): 
         '''
         Create a dataframe with 2 cols: image path and gt_path
@@ -179,12 +178,36 @@ class ACDCProcessed(ACDC):
 
             es_path = os.path.join(root, patient_id + "_ES" + "_processed.nii.gz")
             es_gt_path = os.path.join(root, patient_id + "_ES_gt" + "_processed.nii.gz")
-            
 
             img_list.append(ed_path)
             img_list.append(es_path)
             gt_list.append(ed_gt_path)
             gt_list.append(es_gt_path)
+
+            if self.is_testset == False: 
+                ed_path_a0 = os.path.join(root, patient_id + "_ED"  + "_processed_augmented0.nii.gz")
+                ed_path_a1 = os.path.join(root, patient_id + "_ED"  + "_processed_augmented1.nii.gz")
+
+                ed_gt_path_a0 = os.path.join(root, patient_id + "_ED_gt" + "_processed_augmented0.nii.gz")
+                ed_gt_path_a1 = os.path.join(root, patient_id + "_ED_gt" + "_processed_augmented1.nii.gz")
+
+                es_path_a0 = os.path.join(root, patient_id + "_ES" + "_processed_augmented0.nii.gz")
+                es_path_a1 = os.path.join(root, patient_id + "_ES" + "_processed_augmented1.nii.gz")
+
+                es_gt_path_a0 = os.path.join(root, patient_id + "_ES_gt" + "_processed_augmented0.nii.gz")
+                es_gt_path_a1 = os.path.join(root, patient_id + "_ES_gt" + "_processed_augmented1.nii.gz")
+            
+                img_list.append(ed_path_a0)
+                img_list.append(ed_path_a1)
+
+                img_list.append(es_path_a0)
+                img_list.append(es_path_a1)
+
+                gt_list.append(ed_gt_path_a0)
+                gt_list.append(ed_gt_path_a1)
+
+                gt_list.append(es_gt_path_a0)
+                gt_list.append(es_gt_path_a1)
         
         df = pd.DataFrame({
             "img": img_list, 
@@ -194,7 +217,7 @@ class ACDCProcessed(ACDC):
 
 # For testing only
 if __name__ == "__main__": 
-    dataset = ACDCProcessed("processed/training")
+    dataset = ACDCProcessed("processed/training", is_testset=False)
     
     print("Data size:", len(dataset))
     for i in range(len(dataset)):
@@ -207,6 +230,7 @@ if __name__ == "__main__":
 
         print("Image shape:", img.size())
         print("GT shape:", gt.size())
+        break
 
         # for j in range(img.shape[2]):
         #     print(f"Layer {j}")

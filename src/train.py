@@ -44,8 +44,8 @@ def train(rank, world_size):
     # kf = KFold(n_splits=5, shuffle=True, random_state=42)
     # fold_results = []
 
-    train_dataset = ACDCProcessed("processed/training/")
-    valid_dataset = ACDCProcessed("processed/valid/")
+    train_dataset = ACDCProcessed("processed/training/", is_testset=False)
+    valid_dataset = ACDCProcessed("processed/valid/", is_testset=True)
     # global_min_loss = 9999
 
     # for fold, (train_idx, val_idx) in enumerate(kf.split(dataset)): 
