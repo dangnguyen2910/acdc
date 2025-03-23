@@ -157,14 +157,46 @@ class ACDC(Dataset):
         
         return resampled_image
 
+        
+class ACDCProcessed(ACDC): 
+    def make_dataframe(self): 
+        '''
+        Create a dataframe with 2 cols: image path and gt_path
+        '''
+        img_list = []
+        gt_list = []
+                
+        for root, _, files in os.walk(self.data_path): 
+            files = [os.path.join(root, file) for file in files]
+
+            if (len(files) == 0): 
+                continue
+
+            patient_id = os.path.basename(root)
+
+            ed_path = os.path.join(root, patient_id + "_ED"  + "_processed.nii.gz")
+            ed_gt_path = os.path.join(root, patient_id + "_ED_gt" + "_processed.nii.gz")
+
+            es_path = os.path.join(root, patient_id + "_ES" + "_processed.nii.gz")
+            es_gt_path = os.path.join(root, patient_id + "_ES_gt" + "_processed.nii.gz")
+            
+
+            img_list.append(ed_path)
+            img_list.append(es_path)
+            gt_list.append(ed_gt_path)
+            gt_list.append(es_gt_path)
+        
+        df = pd.DataFrame({
+            "img": img_list, 
+            "gt": gt_list
+        })
+        return df
+
 # For testing only
 if __name__ == "__main__": 
-    dataset = ACDC("database/training")
-    # model = UNet3D(1,4,is_segmentation=False)
-    loss_fn = torch.nn.CrossEntropyLoss()
+    dataset = ACDCProcessed("processed/training")
     
     print("Data size:", len(dataset))
-    # ed, ed_gt, es, es_gt = dataset[0]
     for i in range(len(dataset)):
         print("New image")
         img, gt = dataset[i]
@@ -172,24 +204,18 @@ if __name__ == "__main__":
         img = img.unsqueeze(0)
         gt = gt.unsqueeze(0).squeeze(1)
         
-        # with torch.no_grad(): 
-        #     output = model(img)
 
         print("Image shape:", img.size())
         print("GT shape:", gt.size())
-        # print("Output shape:", output.size())
 
-        # loss = loss_fn(output, gt)
-        # print("Loss:", loss.item())
+        # for j in range(img.shape[2]):
+        #     print(f"Layer {j}")
+        #     img_tmp = img.squeeze().permute(1,2,0).cpu()[:,:,j]
+        #     # output = output.squeeze().permute(1,2,0).detach().numpy()[:,:,0]
+        #     gt_tmp = gt.squeeze().permute(1,2,0).cpu()[:,:,j]
 
-        for j in range(img.shape[2]):
-            print(f"Layer {j}")
-            img_tmp = img.squeeze().permute(1,2,0).cpu()[:,:,j]
-            # output = output.squeeze().permute(1,2,0).detach().numpy()[:,:,0]
-            gt_tmp = gt.squeeze().permute(1,2,0).cpu()[:,:,j]
-
-            fig, ax = plt.subplots(1,2)
-            ax[0].imshow(img_tmp, 'gray')
-            ax[1].imshow(gt_tmp)
-            plt.show()
-            plt.close()
+        #     fig, ax = plt.subplots(1,2)
+        #     ax[0].imshow(img_tmp, 'gray')
+        #     ax[1].imshow(gt_tmp)
+        #     plt.show()
+        #     plt.close()

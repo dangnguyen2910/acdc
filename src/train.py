@@ -14,8 +14,11 @@ import torch.multiprocessing as mp
 import torchvision.transforms.v2 as v2
 
 from src.model.model import UNet3D
-from src.dataset import ACDC
+from src.dataset import ACDC, ACDCProcessed
 from src.loss import DiceLoss3D
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+
 
 def print_vram(): 
     print(f"Allocated: {torch.cuda.memory_allocated()/1e6} MB")
@@ -41,8 +44,8 @@ def train(rank, world_size):
     # kf = KFold(n_splits=5, shuffle=True, random_state=42)
     # fold_results = []
 
-    train_dataset = ACDC("database/training/")
-    valid_dataset = ACDC("database/valid/")
+    train_dataset = ACDCProcessed("processed/training/")
+    valid_dataset = ACDCProcessed("processed/valid/")
     # global_min_loss = 9999
 
     # for fold, (train_idx, val_idx) in enumerate(kf.split(dataset)): 
@@ -52,7 +55,7 @@ def train(rank, world_size):
     model = UNet3D(in_channels=1, out_channels=4, is_segmentation=False).to(rank)
     model = DDP(model, device_ids=[rank])
 
-    loss_fn = nn.CrossEntropyLoss()
+    loss_fn = DiceLoss3D()
     optimizer = torch.optim.Adam(model.parameters(), lr = 0.0001, foreach=True)
 
     # train_subset = Subset(dataset, train_idx)
@@ -63,12 +66,14 @@ def train(rank, world_size):
         batch_size=batch_size, 
         shuffle=False, 
         num_workers = 2,
-        sampler=DistributedSampler(train_dataset))
+        sampler=DistributedSampler(train_dataset)
+    )
     valid_dataloader = DataLoader(valid_dataset, 
         batch_size=batch_size, 
         shuffle=False, 
         num_workers = 2,
-        sampler=DistributedSampler(valid_dataset))
+        sampler=DistributedSampler(valid_dataset)
+    )
 
     train_loss = []
     val_loss = []
@@ -80,8 +85,8 @@ def train(rank, world_size):
             print("-" * 50)
             print(f"Epoch [{epoch+1}/{EPOCHS}]: ")
 
-        train_dataloader.sampler.set_epoch(epoch)
-        valid_dataloader.sampler.set_epoch(epoch)
+        # train_dataloader.sampler.set_epoch(epoch)
+        # valid_dataloader.sampler.set_epoch(epoch)
 
         if (rank == 0):
             print_vram()
