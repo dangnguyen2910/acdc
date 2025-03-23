@@ -149,7 +149,7 @@ def train_one_epoch(rank, model, train_dataloader, loss_fn, optimizer):
         if (i % 10 == 9 and rank == 0): 
             print(f"[{i+1}/{len(train_dataloader)}]")
 
-        del loss, output
+        del loss, output, img, gt
         torch.cuda.empty_cache()
 
     return running_loss/len(train_dataloader)
@@ -185,7 +185,7 @@ def average_loss(loss, world_size):
     '''
     loss_tensor = torch.tensor(loss, device = "cpu")
     dist.all_reduce(loss_tensor, op=dist.ReduceOp.SUM)
-    return loss_tensor.item()/world_size
+    return loss_tensor.detach().item()/world_size
 
 
 def main(): 

@@ -3,3 +3,5 @@ database
 __pycache__
 nohup.out
 processed/
+train_result.csv
+*.ipynb

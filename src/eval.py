@@ -1,10 +1,13 @@
+import os
 import numpy as np 
 import matplotlib.pyplot as plt
 import torch 
 from torch.utils.data import DataLoader
 
 from src.model.model import UNet3D
-from src.dataset import ACDC
+from src.dataset import ACDC, ACDCProcessed
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 def dice_coefficient(pred, target, num_classes, epsilon=1e-6):
     dice_scores = []
@@ -21,7 +24,7 @@ def dice_coefficient(pred, target, num_classes, epsilon=1e-6):
     
     return dice_scores
 
-device = "cpu"
+device = "cuda"
 model = UNet3D(in_channels=1, out_channels=4, is_segmentation=False).to(device)
 
 
@@ -29,7 +32,7 @@ state_dict = torch.load("model/unet3d.pth")
 
 model.load_state_dict(state_dict)
 
-test_dataset = ACDC("database/testing")
+test_dataset = ACDCProcessed("processed/testing")
 test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
 dices = []
@@ -40,9 +43,6 @@ class3_dice = []
 
 with torch.no_grad(): 
     for i,data in enumerate(test_dataloader): 
-        if (i == 10): 
-            break
-
         img, gt = data
         img = img.to(device)
         gt = gt.to(device)
@@ -63,10 +63,10 @@ with torch.no_grad():
         dice_scores = dice_coefficient(output, gt, 4)
         class0, class1, class2, class3 = dice_scores
         print(class0, class1, class2, class3)
-        class0_dice.append(class0)
-        class1_dice.append(class1)
-        class2_dice.append(class2)
-        class3_dice.append(class3)
+        class0_dice.append(class0.cpu())
+        class1_dice.append(class1.cpu())
+        class2_dice.append(class2.cpu())
+        class3_dice.append(class3.cpu())
 
 # mean_dice_class0 = np.mean(class0_dice)
 mean_dice_class1 = np.mean(class1_dice)
