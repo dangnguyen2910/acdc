@@ -21,8 +21,8 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0,1"
 
 
 def print_vram(): 
-    print(f"Allocated: {torch.cuda.memory_allocated()/1e6} MB")
-    print(f"Reserved: {torch.cuda.memory_reserved()/1e6} MB")
+    print(f"Allocated: {torch.cuda.memory_allocated()/1e6} MB", flush = True)
+    print(f"Reserved: {torch.cuda.memory_reserved()/1e6} MB", flush = True)
 
 def setup(rank, world_size): 
     os.environ["MASTER_ADDR"] = "localhost"
@@ -38,7 +38,7 @@ def cleanup():
 def train(rank, world_size): 
     setup(rank, world_size)
 
-    batch_size = 1
+    batch_size = 2
     EPOCHS = 40
 
     train_dataset = ACDCProcessed("processed/training/", is_testset=False)
@@ -73,8 +73,8 @@ def train(rank, world_size):
     for epoch in range(EPOCHS): 
         if (rank == 0): 
             start = time.time()
-            print("-" * 50)
-            print(f"Epoch [{epoch+1}/{EPOCHS}]: ")
+            print("-" * 50, flush = True)
+            print(f"Epoch [{epoch+1}/{EPOCHS}]: ", flush = True)
 
         train_sampler.set_epoch(epoch)
         # valid_dataloader.sampler.set_epoch(epoch)
@@ -91,13 +91,13 @@ def train(rank, world_size):
             train_loss.append(avg_loss)
             val_loss.append(avg_vloss)
 
-            print(f"\tTrain loss: {avg_loss}")
-            print(f"\tValidation loss: {avg_vloss}")
+            print(f"\tTrain loss: {avg_loss}", flush = True)
+            print(f"\tValidation loss: {avg_vloss}", flush = True)
 
             if (avg_vloss < min_loss): 
                 min_loss = avg_vloss
 
-                model_path = "model/unet3d.pth"
+                model_path = "model/unet3d_2.pth"
 
                 torch.save(model.module.state_dict(), model_path)
                 torch.cuda.empty_cache()
@@ -111,7 +111,7 @@ def train(rank, world_size):
         "train_loss": train_loss, 
         "val_loss": val_loss
     })
-    df.to_csv(f"train_result.csv", index = False)
+    df.to_csv(f"train_result_2.csv", index = False)
     # del model, loss_fn, optimizer, train_dataloader, valid_dataloader
     # torch.cuda.empty_cache()
     # gc.collect()
@@ -134,7 +134,7 @@ def train_one_epoch(rank, model, train_dataloader, loss_fn, optimizer):
 
         running_loss += loss.item()
         if (i % 10 == 9 and rank == 0): 
-            print(f"[{i+1}/{len(train_dataloader)}]")
+            print(f"[{i+1}/{len(train_dataloader)}]", flush = True)
             print_vram()
 
         del loss, output, img, gt
@@ -158,7 +158,7 @@ def eval_one_epoch(rank, model, valid_dataloader, loss_fn):
             
             running_vloss += loss.item()
             if (i % 10 == 9 and rank == 0): 
-                print(f"[{i+1}/{len(valid_dataloader)}]")
+                print(f"[{i+1}/{len(valid_dataloader)}]", flush = True)
 
     return running_vloss/len(valid_dataloader)
 
@@ -178,7 +178,7 @@ def average_loss(loss, world_size):
 
 def main(): 
     world_size = torch.cuda.device_count()
-    print("Device count:", world_size)
+    print("Device count:", world_size, flush = True)
     mp.spawn(
         train, 
         args=(world_size,), 

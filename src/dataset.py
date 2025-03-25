@@ -22,11 +22,13 @@ class ACDC(Dataset):
         self.df = self.make_dataframe()
         self.transform = tio.Compose([
             tio.RescaleIntensity(out_min_max=(0,1)), 
-            tio.Resize((10,320,320))
+            tio.Resize((10,352,352)), 
+            tio.Crop((0,0,64,64,64,64))
         ])
 
         self.gt_transform = tio.Compose([
-            tio.Resize((10,320,320))
+            tio.Resize((10,352,352)),
+            tio.Crop((0,0,64,64,64,64))
         ])
 
 
