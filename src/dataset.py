@@ -13,6 +13,12 @@ import os
 warnings.filterwarnings("ignore")
 
 class ACDC(Dataset): 
+    """ 
+    Class for ACDC original dataset
+    
+    Parameter: 
+        data_path (string): path to training or testing set
+    """
     def __init__(self, data_path):
         super().__init__()
         self.data_path = data_path
@@ -20,16 +26,19 @@ class ACDC(Dataset):
             os.path.join(data_path, folder) for folder in os.listdir(data_path)
         ]
         self.df = self.make_dataframe() 
-        self.transform = tio.Compose([
-            tio.RescaleIntensity(out_min_max=(0,1)), 
-            tio.CropOrPad((10, 352, 352)),
-            tio.Crop((0,0,64,64,64,64))
-        ])
+        self.num_layers = 0
+        # self.transform = tio.Compose([
+        #     tio.RescaleIntensity(out_min_max=(0,1)),
+        #     tio.Resize((self.num_layers, 352,352)), 
+        #     tio.CropOrPad((10, 352, 352)),
+        #     tio.Crop((0,0,64,64,64,64))
+        # ])
         
-        self.gt_transform = tio.Compose([
-            tio.CropOrPad((10, 352, 352)),
-            tio.Crop((0,0,64,64,64,64))
-        ])
+        # self.gt_transform = tio.Compose([
+        #     tio.Resize((self.num_layers, 352,352)), 
+        #     tio.CropOrPad((10, 352, 352)),
+        #     tio.Crop((0,0,64,64,64,64))
+        # ])
 
 
     def __getitem__(self, index):
@@ -43,9 +52,27 @@ class ACDC(Dataset):
         gt = sitk.GetArrayFromImage(gt)
 
         img = torch.tensor(img).unsqueeze(0)
-        img = self.transform(img)
-        
         gt = torch.tensor(gt).unsqueeze(0)
+        
+        
+        assert img.size(1) == gt.size(1)
+        num_layers = img.size(1)
+        
+        transform = tio.Compose([
+            tio.RescaleIntensity(out_min_max=(0,1)),
+            tio.Resize((num_layers, 352,352)), 
+            tio.CropOrPad((10, 352, 352)),
+            tio.Crop((0,0,64,64,64,64))
+        ])
+        
+        gt_transform = tio.Compose([
+            tio.Resize((num_layers, 352,352)), 
+            tio.CropOrPad((10, 352, 352)),
+            tio.Crop((0,0,64,64,64,64))
+        ])
+        
+        
+        img = self.transform(img)
         gt = self.gt_transform(gt).to(torch.long)
         
         return img, gt
@@ -96,7 +123,7 @@ class ACDC(Dataset):
         df = pd.DataFrame({
             "img": img_list, 
             "gt": gt_list
-        })
+        }).sort_values(by="img")
         return df
 
 
@@ -137,6 +164,15 @@ class ACDC(Dataset):
 
         
 class ACDCProcessed(ACDC): 
+    """ 
+    Subclass of ACDC to deal with processed dataset
+    
+    Parameter: 
+        data_path (string): path of training or testing
+        is_testset (bool): True if loading validation or test set    
+    
+    """
+    
     def __init__(self, data_path, is_testset): 
         self.is_testset = is_testset
         super().__init__(data_path)
@@ -154,11 +190,26 @@ class ACDCProcessed(ACDC):
         gt = sitk.GetArrayFromImage(gt)
 
         img = torch.tensor(img).unsqueeze(0)
-        img = self.transform(img)
-        
         gt = torch.tensor(gt).unsqueeze(0)
         gt = (gt == obj_ids[:,None,None,None])
-        gt = self.gt_transform(gt).to(torch.long)
+        
+        num_layers = img.size(1)
+        
+        transform = tio.Compose([
+            tio.RescaleIntensity(out_min_max=(0,1)),
+            tio.Resize((num_layers, 352,352)), 
+            tio.CropOrPad((10, 352, 352)),
+            tio.Crop((0,0,64,64,64,64))
+        ])
+        
+        gt_transform = tio.Compose([
+            tio.Resize((num_layers, 352,352)), 
+            tio.CropOrPad((10, 352, 352)),
+            tio.Crop((0,0,64,64,64,64))
+        ])
+        
+        img = transform(img)
+        gt = gt_transform(gt).to(torch.long)
         
         return img, gt
 
@@ -217,7 +268,7 @@ class ACDCProcessed(ACDC):
         df = pd.DataFrame({
             "img": img_list, 
             "gt": gt_list
-        })
+        }).sort_values(by="img")
         return df
 
 # For testing only

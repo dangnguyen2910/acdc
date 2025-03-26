@@ -67,36 +67,3 @@ if __name__ == "__main__":
     print("Mean Dice of class 1", mean_dice_class1)
     print("Mean Dice of class 2", mean_dice_class2)
     print("Mean Dice of class 3", mean_dice_class3)
-
-
-
-
-
-def dice_coefficient(pred, target, num_classes, epsilon=1e-6):
-    """ 
-    Calculate the dice coefficient
-    
-    Parameter: 
-        pred: binary multichannels predicted mask (C, L, H, W)
-        target: binary multichannel ground truth mask (C, L, H, W)
-        num_class: number of classes
-        epsilon = 10^-6: smoothing factor
-    Output: 
-        float: 
-    """
-    dice_scores = []
-    
-    
-    # dice_scores = []
-    
-    # for class_idx in range(num_classes):
-    #     pred_binary = (pred == class_idx)  
-    #     target_binary = (target == class_idx) 
-        
-    #     intersection = (pred_binary & target_binary).sum().float()
-    #     union = pred_binary.sum().float() + target_binary.sum().float()
-        
-    #     dice = (2.0 * intersection + epsilon) / (union + epsilon)
-    #     dice_scores.append(dice)
-    
-    # return dice_scores

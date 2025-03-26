@@ -25,16 +25,18 @@ class DiceLoss3D(nn.Module):
         # gt_flat = pred.contiguous().view(-1)
         # print(pred_flat.size())
         
-        intersection = (pred * gt).sum(dim = (2,3,4))
+        intersection = (pred * gt).sum(dim = (1,2,3,4))
 
-        pred_sum = (pred * pred).sum(dim = (2,3,4))
-        gt_sum = (gt * gt).sum(dim = (2,3,4))
+        pred_sum = (pred * pred).sum(dim = (1,2,3,4))
+        gt_sum = (gt * gt).sum(dim = (1,2,3,4))
 
         numerator = 2 * intersection + self.epsilon
         denom = pred_sum + gt_sum + self.epsilon
         
         dice = numerator/denom
-        return 1 - dice.mean()
+        dice_loss = 1 - dice.mean()
+  
+        return dice_loss
         
         # target = target.unsqueeze(1)
         # pred = F.softmax(pred, dim=1)  
