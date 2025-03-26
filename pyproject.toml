@@ -1,0 +1,9 @@
+[tool.pytest.ini_options]
+pythonpath = [
+  "."
+]
+filterwarnings = [
+    "error",
+    "ignore::DeprecationWarning",
+]
+testpaths = ["tests"]
