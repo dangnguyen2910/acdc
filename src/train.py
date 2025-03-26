@@ -16,6 +16,7 @@ import torchvision.transforms.v2 as v2
 from src.model.model import UNet3D
 from src.dataset import ACDC, ACDCProcessed
 from src.loss import DiceLoss3D
+from src.eval import dice_coefficient
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0,1"
 
@@ -39,12 +40,14 @@ def train(rank, world_size):
     setup(rank, world_size)
 
     batch_size = 2
-    EPOCHS = 40
+    EPOCHS = 2
+    model_path = "model/unet3d_3.pth"
+    train_result_path = "train_result_3.csv"
 
-    train_dataset = ACDCProcessed("processed/training/", is_testset=False)
-    valid_dataset = ACDCProcessed("processed/valid/", is_testset=True)
+    train_dataset = ACDCProcessed("just_to_test/training/", is_testset=False)
+    valid_dataset = ACDCProcessed("just_to_test/valid/", is_testset=True)
 
-    model = UNet3D(in_channels=1, out_channels=4, is_segmentation=False).to(rank)
+    model = UNet3D(in_channels=1, out_channels=3).to(rank)
     model = DDP(model, device_ids=[rank])
 
     loss_fn = DiceLoss3D()
@@ -97,7 +100,6 @@ def train(rank, world_size):
             if (avg_vloss < min_loss): 
                 min_loss = avg_vloss
 
-                model_path = "model/unet3d_2.pth"
 
                 torch.save(model.module.state_dict(), model_path)
                 torch.cuda.empty_cache()
@@ -111,7 +113,7 @@ def train(rank, world_size):
         "train_loss": train_loss, 
         "val_loss": val_loss
     })
-    df.to_csv(f"train_result_2.csv", index = False)
+    df.to_csv(f"{train_result_path}", index = False)
     # del model, loss_fn, optimizer, train_dataloader, valid_dataloader
     # torch.cuda.empty_cache()
     # gc.collect()

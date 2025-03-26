@@ -5,3 +5,6 @@ nohup.out
 processed/
 train_result.csv
 *.ipynb
+just_to_test
+*.zip
+one_patient/patient101

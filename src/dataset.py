@@ -19,15 +19,15 @@ class ACDC(Dataset):
         self.patient_folders = [
             os.path.join(data_path, folder) for folder in os.listdir(data_path)
         ]
-        self.df = self.make_dataframe()
+        self.df = self.make_dataframe() 
         self.transform = tio.Compose([
             tio.RescaleIntensity(out_min_max=(0,1)), 
-            tio.Resize((10,352,352)), 
+            tio.CropOrPad((10, 352, 352)),
             tio.Crop((0,0,64,64,64,64))
         ])
-
+        
         self.gt_transform = tio.Compose([
-            tio.Resize((10,352,352)),
+            tio.CropOrPad((10, 352, 352)),
             tio.Crop((0,0,64,64,64,64))
         ])
 
@@ -144,6 +144,8 @@ class ACDCProcessed(ACDC):
     def __getitem__(self, index):
         img_path = self.df.iloc[index, 0]
         gt_path = self.df.iloc[index, 1]
+
+        obj_ids = torch.tensor([1,2,3]).to(torch.long)
         
         img = sitk.ReadImage(img_path)
         gt = sitk.ReadImage(gt_path)
@@ -155,6 +157,7 @@ class ACDCProcessed(ACDC):
         img = self.transform(img)
         
         gt = torch.tensor(gt).unsqueeze(0)
+        gt = (gt == obj_ids[:,None,None,None])
         gt = self.gt_transform(gt).to(torch.long)
         
         return img, gt
