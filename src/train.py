@@ -16,9 +16,8 @@ import torchvision.transforms.v2 as v2
 from src.model.model import UNet3D
 from src.dataset import ACDC, ACDCProcessed
 from src.loss import DiceLoss3D
-from src.eval import dice_coefficient
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0,1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 
 def print_vram(): 
@@ -40,7 +39,7 @@ def train(rank, world_size):
     setup(rank, world_size)
 
     batch_size = 2
-    EPOCHS = 2
+    EPOCHS = 50
     model_path = "model/unet3d_3.pth"
     train_result_path = "train_result_3.csv"
 
@@ -80,26 +79,24 @@ def train(rank, world_size):
             print(f"Epoch [{epoch+1}/{EPOCHS}]: ", flush = True)
 
         train_sampler.set_epoch(epoch)
-        # valid_dataloader.sampler.set_epoch(epoch)
 
         model.train()
         loss = train_one_epoch(rank, model, train_dataloader, loss_fn, optimizer)
-        avg_loss = average_loss(loss, world_size)
 
         model.eval()
         vloss = eval_one_epoch(rank, model, valid_dataloader, loss_fn)
-        avg_vloss = average_loss(vloss, world_size)
+        
+        torch.distributed.barrier()
         
         if (rank == 0): 
-            train_loss.append(avg_loss)
-            val_loss.append(avg_vloss)
+            train_loss.append(loss)
+            val_loss.append(vloss)
 
-            print(f"\tTrain loss: {avg_loss}", flush = True)
-            print(f"\tValidation loss: {avg_vloss}", flush = True)
+            print(f"Train loss: {loss}", flush = True)
+            print(f"\tValidation loss: {vloss}", flush = True)
 
-            if (avg_vloss < min_loss): 
-                min_loss = avg_vloss
-
+            if (vloss < min_loss): 
+                min_loss = vloss
 
                 torch.save(model.module.state_dict(), model_path)
                 torch.cuda.empty_cache()
@@ -114,9 +111,6 @@ def train(rank, world_size):
         "val_loss": val_loss
     })
     df.to_csv(f"{train_result_path}", index = False)
-    # del model, loss_fn, optimizer, train_dataloader, valid_dataloader
-    # torch.cuda.empty_cache()
-    # gc.collect()
 
 
 def train_one_epoch(rank, model, train_dataloader, loss_fn, optimizer): 
@@ -163,19 +157,6 @@ def eval_one_epoch(rank, model, valid_dataloader, loss_fn):
                 print(f"[{i+1}/{len(valid_dataloader)}]", flush = True)
 
     return running_vloss/len(valid_dataloader)
-
-
-def average_loss(loss, world_size): 
-    '''
-    Average loss in all processes
-
-    Parameter: 
-    --- 
-    world_size (int): Number of processes
-    '''
-    loss_tensor = torch.tensor(loss, device = "cpu")
-    dist.all_reduce(loss_tensor, op=dist.ReduceOp.SUM)
-    return loss_tensor.detach().item()/world_size
 
 
 def main(): 

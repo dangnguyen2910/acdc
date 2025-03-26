@@ -1,4 +1,6 @@
 import numpy as np 
+import torch 
+import sys
 
 def calculate_binary_dice(pred_binary, gt_binary):
     """ 
@@ -22,20 +24,24 @@ def calculate_binary_dice(pred_binary, gt_binary):
 
 def calculate_multiclass_dice(pred, gt, num_class = 3): 
     """ 
-    Compute dice coefficient for two multichannel binary mask.
+    Compute dice coefficient for two multichannel binary mask.  
     
-    Parameters:
-    -----------
-    pred (torch.tensor): Predicted mask (num_class, L, H, W)
-    gt (torch.tensor): Ground truth mask (num_class, L, H, W)
-    num_class (int): Number of classes, default = 3
+    Parameters:  
+        pred (torch.tensor): Predicted mask (num_class, L, H, W)
+        gt (torch.tensor): Ground truth mask (num_class, L, H, W)
+        num_class (int): Number of classes, default = 3
     
     Returns:
-    --------
-    list: List of dice values for each class (C)
-    float: Dice coef value.
+        list: List of dice values for each class (C)
+        float: Dice coef value.
     """
     dice_list = []
+    try: 
+        assert torch.equal(torch.unique(pred), torch.tensor([0,1]))
+    except: 
+        print("Your pred mask is not binary")
+        print(torch.unique(pred))
+        sys.exit()
     
     for c in range(num_class): 
         pred_binary = pred[c, :, :, :]
