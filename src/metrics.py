@@ -36,12 +36,6 @@ def calculate_multiclass_dice(pred, gt, num_class = 3):
         float: Dice coef value.
     """
     dice_list = []
-    try: 
-        assert torch.equal(torch.unique(pred), torch.tensor([0,1]))
-    except: 
-        print("Your pred mask is not binary")
-        print(torch.unique(pred))
-        sys.exit()
     
     for c in range(num_class): 
         pred_binary = pred[c, :, :, :]

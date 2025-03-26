@@ -27,18 +27,6 @@ class ACDC(Dataset):
         ]
         self.df = self.make_dataframe() 
         self.num_layers = 0
-        # self.transform = tio.Compose([
-        #     tio.RescaleIntensity(out_min_max=(0,1)),
-        #     tio.Resize((self.num_layers, 352,352)), 
-        #     tio.CropOrPad((10, 352, 352)),
-        #     tio.Crop((0,0,64,64,64,64))
-        # ])
-        
-        # self.gt_transform = tio.Compose([
-        #     tio.Resize((self.num_layers, 352,352)), 
-        #     tio.CropOrPad((10, 352, 352)),
-        #     tio.Crop((0,0,64,64,64,64))
-        # ])
 
 
     def __getitem__(self, index):
@@ -270,32 +258,57 @@ class ACDCProcessed(ACDC):
             "gt": gt_list
         }).sort_values(by="img")
         return df
-
-# For testing only
-if __name__ == "__main__": 
-    dataset = ACDCProcessed("processed/training", is_testset=False)
     
-    print("Data size:", len(dataset))
-    for i in range(len(dataset)):
-        print("New image")
-        img, gt = dataset[i]
+    
+class JustToTest(ACDCProcessed): 
+    """ 
+    Subclass of ACDC to deal with processed dataset
+    
+    Parameter: 
+        data_path (string): path of training or testing
+        is_testset (bool): True if loading validation or test set    
+    
+    """
+    
+    def make_dataframe(self): 
+        '''
+        Create a dataframe with 2 cols: image path and gt_path
+        '''
+        img_list = []
+        gt_list = []
+                
+        for root, _, files in os.walk(self.data_path): 
+            files = [os.path.join(root, file) for file in files]
 
-        img = img.unsqueeze(0)
-        gt = gt.unsqueeze(0).squeeze(1)
+            if (len(files) == 0): 
+                continue
+
+            patient_id = os.path.basename(root)
+
+            ed_path = os.path.join(root, patient_id + "_ED"  + "_processed.nii.gz")
+            ed_gt_path = os.path.join(root, patient_id + "_ED_gt" + "_processed.nii.gz")
+
+            es_path = os.path.join(root, patient_id + "_ES" + "_processed.nii.gz")
+            es_gt_path = os.path.join(root, patient_id + "_ES_gt" + "_processed.nii.gz")
+
+            img_list.append(ed_path)
+            img_list.append(es_path)
+            gt_list.append(ed_gt_path)
+            gt_list.append(es_gt_path)
+
+            if self.is_testset == False: 
+                ed_path_a0 = os.path.join(root, patient_id + "_ED"  + "_processed_augmented0.nii.gz")
+                ed_gt_path_a0 = os.path.join(root, patient_id + "_ED_gt" + "_processed_augmented0.nii.gz")
+                es_path_a0 = os.path.join(root, patient_id + "_ES" + "_processed_augmented0.nii.gz")
+                es_gt_path_a0 = os.path.join(root, patient_id + "_ES_gt" + "_processed_augmented0.nii.gz")
+            
+                img_list.append(ed_path_a0)
+                img_list.append(es_path_a0)
+                gt_list.append(ed_gt_path_a0)
+                gt_list.append(es_gt_path_a0)
         
-
-        print("Image shape:", img.size())
-        print("GT shape:", gt.size())
-        break
-
-        # for j in range(img.shape[2]):
-        #     print(f"Layer {j}")
-        #     img_tmp = img.squeeze().permute(1,2,0).cpu()[:,:,j]
-        #     # output = output.squeeze().permute(1,2,0).detach().numpy()[:,:,0]
-        #     gt_tmp = gt.squeeze().permute(1,2,0).cpu()[:,:,j]
-
-        #     fig, ax = plt.subplots(1,2)
-        #     ax[0].imshow(img_tmp, 'gray')
-        #     ax[1].imshow(gt_tmp)
-        #     plt.show()
-        #     plt.close()
+        df = pd.DataFrame({
+            "img": img_list, 
+            "gt": gt_list
+        }).sort_values(by="img")
+        return df

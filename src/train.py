@@ -1,23 +1,22 @@
-import gc
 import time
 import os
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import KFold
 import torch
 import torch.distributed as dist
 import torch.nn as nn
 from torch.nn.parallel import DistributedDataParallel as DDP 
-from torch.utils.data import DataLoader, Subset
+from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 import torch.multiprocessing as mp
 import torchvision.transforms.v2 as v2
 
-from src.model.model import UNet3D
-from src.dataset import ACDC, ACDCProcessed
+from src.model.model import UNet3D, ResidualUNet3D
+from src.dataset import ACDC, ACDCProcessed, JustToTest
 from src.loss import DiceLoss3D
+from src.metrics import calculate_multiclass_dice
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,1"
 
 
 def print_vram(): 
@@ -43,10 +42,14 @@ def train(rank, world_size):
     model_path = "model/unet3d_3.pth"
     train_result_path = "train_result_3.csv"
 
-    train_dataset = ACDCProcessed("just_to_test/training/", is_testset=False)
-    valid_dataset = ACDCProcessed("just_to_test/valid/", is_testset=True)
+    train_dataset = JustToTest("just_to_test/training/", is_testset=False)
+    valid_dataset = JustToTest("just_to_test/validation/", is_testset=True)
 
     model = UNet3D(in_channels=1, out_channels=3).to(rank)
+    
+    if (os.path.exists(model_path)): 
+        model.load_state_dict(torch.load(model_path))
+        
     model = DDP(model, device_ids=[rank])
 
     loss_fn = DiceLoss3D()
@@ -58,18 +61,18 @@ def train(rank, world_size):
     train_dataloader = DataLoader(
         train_dataset, 
         batch_size=batch_size, 
-        num_workers = 2,
+        num_workers = 1,
         sampler=train_sampler
     )
     valid_dataloader = DataLoader(valid_dataset, 
         batch_size=batch_size, 
-        num_workers = 2,
+        num_workers = 1,
         sampler=val_sampler
     )
 
     train_loss = []
     val_loss = []
-    min_loss = 9999
+    min_loss = 0
 
     # Start training
     for epoch in range(EPOCHS): 
@@ -93,9 +96,9 @@ def train(rank, world_size):
             val_loss.append(vloss)
 
             print(f"Train loss: {loss}", flush = True)
-            print(f"\tValidation loss: {vloss}", flush = True)
+            print(f"Validation Dice Coeff: {vloss}", flush = True)
 
-            if (vloss < min_loss): 
+            if (vloss > min_loss): 
                 min_loss = vloss
 
                 torch.save(model.module.state_dict(), model_path)
@@ -120,7 +123,7 @@ def train_one_epoch(rank, model, train_dataloader, loss_fn, optimizer):
         img, gt = data 
 
         img = img.to(rank)
-        gt = gt.squeeze(1).to(rank)
+        gt = gt.to(rank)
 
         optimizer.zero_grad(set_to_none = True)
         output = model(img)
@@ -141,22 +144,37 @@ def train_one_epoch(rank, model, train_dataloader, loss_fn, optimizer):
 
 def eval_one_epoch(rank, model, valid_dataloader, loss_fn): 
     running_vloss = 0
+    running_vdice = 0
+    batch_dice = []
     
     with torch.no_grad(): 
         for i, data in enumerate(valid_dataloader): 
             img, gt = data
 
             img = img.to(rank)           
-            gt = gt.squeeze(1).to(rank)
+            gt = gt.to(rank)
 
             output = model(img)
             loss = loss_fn(output, gt) 
             
+            output = (output > 0.5).to(torch.long)
+            
+            for batch in range(output.size(0)): 
+                dice_per_batch, _ = calculate_multiclass_dice(
+                    output[batch, :,:,:,:], 
+                    gt[batch, :,:,:,:]
+                )
+                batch_dice.append(dice_per_batch)
+                
+            dice = np.mean(batch_dice)
+              
             running_vloss += loss.item()
+            running_vdice += dice 
+            
             if (i % 10 == 9 and rank == 0): 
                 print(f"[{i+1}/{len(valid_dataloader)}]", flush = True)
 
-    return running_vloss/len(valid_dataloader)
+    return running_vdice/len(valid_dataloader)
 
 
 def main(): 

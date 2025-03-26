@@ -37,5 +37,4 @@ def test_calculate_multiclass_dice_empty():
     gt = torch.zeros(2, 2, 3, 3)
     pred = torch.zeros(2,2,3,3)
     dice, dice_list = calculate_multiclass_dice(pred, gt, 2)
-    print(dice_list)
     assert dice == 1
