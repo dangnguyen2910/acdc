@@ -39,16 +39,17 @@ def train(rank, world_size):
 
     batch_size = 2
     EPOCHS = 50
-    model_path = "model/unet3d_4.pth"
-    train_result_path = "train_result/train_result_4.csv"
+    best_model_path = "model/unet3d_4.pth"
+    model_path = "model/unet3d_5.pth"
+    train_result_path = "train_result/train_result_5.csv"
 
     train_dataset = JustToTest("just_to_test/training/", is_testset=False)
     valid_dataset = JustToTest("just_to_test/validation/", is_testset=True)
 
     model = UNet3D(in_channels=1, out_channels=3).to(rank)
     
-    if (os.path.exists(model_path)): 
-        model.load_state_dict(torch.load(model_path))
+    if (os.path.exists(best_model_path)): 
+        model.load_state_dict(torch.load(best_model_path))
         
     model = DDP(model, device_ids=[rank])
 
@@ -72,7 +73,7 @@ def train(rank, world_size):
 
     train_loss = []
     val_loss = []
-    min_loss = 0
+    min_loss = 0.8
 
     # Start training
     for epoch in range(EPOCHS): 
