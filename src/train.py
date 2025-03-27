@@ -16,7 +16,7 @@ from src.dataset import ACDC, ACDCProcessed, JustToTest
 from src.loss import DiceLoss3D
 from src.metrics import calculate_multiclass_dice
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0,1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 
 def print_vram(): 
@@ -39,8 +39,8 @@ def train(rank, world_size):
 
     batch_size = 2
     EPOCHS = 50
-    model_path = "model/unet3d_3.pth"
-    train_result_path = "train_result_3.csv"
+    model_path = "model/unet3d_4.pth"
+    train_result_path = "train_result/train_result_4.csv"
 
     train_dataset = JustToTest("just_to_test/training/", is_testset=False)
     valid_dataset = JustToTest("just_to_test/validation/", is_testset=True)

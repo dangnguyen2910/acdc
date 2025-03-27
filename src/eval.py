@@ -12,12 +12,12 @@ if __name__ == "__main__":
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
     
     device = "cuda"
-    model_path = "model/unet3d_3.pth"
+    model_path = "model/unet3d_4.pth"
     print(f"Using {model_path}")
 
     model = UNet3D(in_channels=1, out_channels=3).to(device)
 
-    model.load_state_dict(torch.load("model/unet3d_3.pth"))
+    model.load_state_dict(torch.load(model_path))
 
     test_dataset = JustToTest("just_to_test/testing", is_testset=True)
     test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False)
@@ -57,3 +57,4 @@ if __name__ == "__main__":
     print("Mean Dice of class 2: ", mean_dice_class2)
     print("Mean Dice of class 3: ", mean_dice_class3)
     print("Mean Dice: ", np.mean(dices))
+

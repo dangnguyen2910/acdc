@@ -196,10 +196,25 @@ class ACDCProcessed(ACDC):
             tio.Crop((0,0,64,64,64,64))
         ])
         
+        augment = tio.Compose([
+            tio.RandomFlip(axes=(1,2)), 
+            tio.RandomElasticDeformation(max_displacement=1), 
+            tio.RandomMotion(translation=2, num_transforms=1), 
+            tio.RandomGamma()
+        ])
+        
         img = transform(img)
         gt = gt_transform(gt).to(torch.long)
         
-        return img, gt
+        subject = tio.Subject(
+            image = tio.ScalarImage(tensor = img), 
+            mask = tio.LabelMap(tensor = gt)
+        )
+        
+        if (not self.is_testset): 
+            subject = augment(subject)
+        
+        return subject.image.tensor, subject.mask.tensor
 
 
     def make_dataframe(self): 
