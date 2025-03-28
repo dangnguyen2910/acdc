@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import torch 
 from torch.utils.data import DataLoader
 
-from src.model.model import UNet3D
+from src.model.unet import UNet3D
 from src.dataset import ACDC, ACDCProcessed, JustToTest
 from src.metrics import calculate_multiclass_dice
 
@@ -12,10 +12,10 @@ if __name__ == "__main__":
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
     
     device = "cuda"
-    model_path = "model/unet3d_4.pth"
+    model_path = "model/unet3d_6.pth"
     print(f"Using {model_path}")
 
-    model = UNet3D(in_channels=1, out_channels=3).to(device)
+    model = UNet3D().to(device)
 
     model.load_state_dict(torch.load(model_path))
 

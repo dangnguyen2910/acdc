@@ -11,12 +11,13 @@ from torch.utils.data.distributed import DistributedSampler
 import torch.multiprocessing as mp
 import torchvision.transforms.v2 as v2
 
-from src.model.model import UNet3D, ResidualUNet3D
+# from src.model.model import UNet3D, ResidualUNet3D
+from src.model.unet import UNet3D
 from src.dataset import ACDC, ACDCProcessed, JustToTest
 from src.loss import DiceLoss3D
 from src.metrics import calculate_multiclass_dice
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,1"
 
 
 def print_vram(): 
@@ -39,14 +40,16 @@ def train(rank, world_size):
 
     batch_size = 2
     EPOCHS = 50
-    best_model_path = "model/unet3d_4.pth"
-    model_path = "model/unet3d_5.pth"
-    train_result_path = "train_result/train_result_5.csv"
+    best_model_path = "model/unet3d_6.pth"
+    model_path = "model/unet3d_6.pth"
+    train_result_path = "train_result/train_result_6.csv"
+    min_loss = 0
+    
 
     train_dataset = JustToTest("just_to_test/training/", is_testset=False)
     valid_dataset = JustToTest("just_to_test/validation/", is_testset=True)
 
-    model = UNet3D(in_channels=1, out_channels=3).to(rank)
+    model = UNet3D().to(rank)
     
     if (os.path.exists(best_model_path)): 
         model.load_state_dict(torch.load(best_model_path))
@@ -55,6 +58,7 @@ def train(rank, world_size):
 
     loss_fn = DiceLoss3D()
     optimizer = torch.optim.Adam(model.parameters(), lr = 0.0001, foreach=True)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max')
 
     train_sampler = DistributedSampler(train_dataset, shuffle=True)
     val_sampler = DistributedSampler(valid_dataset, shuffle=False)
@@ -73,7 +77,6 @@ def train(rank, world_size):
 
     train_loss = []
     val_loss = []
-    min_loss = 0.8
 
     # Start training
     for epoch in range(EPOCHS): 
@@ -89,6 +92,7 @@ def train(rank, world_size):
 
         model.eval()
         vloss = eval_one_epoch(rank, model, valid_dataloader, loss_fn)
+        scheduler.step(vloss)
         
         torch.distributed.barrier()
         
@@ -130,6 +134,7 @@ def train_one_epoch(rank, model, train_dataloader, loss_fn, optimizer):
         output = model(img)
         loss = loss_fn(output, gt)
         loss.backward()
+        torch.cuda.synchronize()
         optimizer.step() 
 
         running_loss += loss.item()

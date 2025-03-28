@@ -184,7 +184,7 @@ class ACDCProcessed(ACDC):
         num_layers = img.size(1)
         
         transform = tio.Compose([
-            tio.RescaleIntensity(out_min_max=(0,1)),
+            tio.ZNormalization(),
             tio.Resize((num_layers, 352,352)), 
             tio.CropOrPad((10, 352, 352)),
             tio.Crop((0,0,64,64,64,64))
