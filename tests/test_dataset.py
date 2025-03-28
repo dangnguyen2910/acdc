@@ -1,7 +1,9 @@
 import pytest 
 import torch
 
-from src.dataset import ACDC, ACDCProcessed, JustToTest
+from src.dataset.acdc import ACDC
+from src.dataset.acdc_processed import ACDCProcessed
+from src.dataset.just_to_test import JustToTest
 
 
 @pytest.fixture
@@ -11,19 +13,19 @@ def dataset():
 
 def test_dataset_make_dataframe(dataset): 
     df = dataset.df 
-    assert df.iloc[0,0] == "database/training/patient001/patient001_ED_processed.nii.gz"
-    assert df.iloc[6,0] == "database/training/patient002/patient002_ED_processed.nii.gz"
-    assert df.shape == (480,2)
+    assert df.iloc[0,0] == "database/training/patient001/patient001_frame01.nii.gz"
+    assert df.iloc[2,0] == "database/training/patient002/patient002_frame01.nii.gz"
+    assert df.shape == (160,2)
     
-def test_dataset_shape(processed_dataset): 
-    img, gt = processed_dataset[0]
+def test_dataset_shape(dataset): 
+    img, gt = dataset[0]
     assert img.size() == torch.Size([1, 10, 224, 224])
     assert gt.size() == torch.Size([3, 10, 224, 224])
 
 
 @pytest.fixture
 def processed_dataset(): 
-    processed_dataset = ACDC("processed/training", is_testset=False)
+    processed_dataset = ACDCProcessed("processed/training", is_testset=False)
     return processed_dataset 
 
 def test_processed_dataset_make_dataframe(processed_dataset): 
@@ -36,9 +38,11 @@ def test_processed_dataset_shape(processed_dataset):
     img, gt = processed_dataset[0]
     assert img.size() == torch.Size([1, 10, 224, 224])
     assert gt.size() == torch.Size([3, 10, 224, 224])
+
+    
 @pytest.fixture
 def processed_dataset(): 
-    processed_dataset = ACDC("processed/training", is_testset=False)
+    processed_dataset = ACDCProcessed("processed/training", is_testset=False)
     return processed_dataset 
 
 def test_processed_dataset_make_dataframe(processed_dataset): 
@@ -49,23 +53,6 @@ def test_processed_dataset_make_dataframe(processed_dataset):
     
 def test_processed_dataset_shape(processed_dataset): 
     img, gt = processed_dataset[0]
-    assert img.size() == torch.Size([1, 10, 224, 224])
-    assert gt.size() == torch.Size([3, 10, 224, 224])
-    
-    
-@pytest.fixture
-def new_processed_dataset(): 
-    new_processed_dataset = ACDCProcessed("just_to_test/training", is_testset=False)
-    return new_processed_dataset 
-
-def test_new_processed_dataset_make_dataframe(new_processed_dataset): 
-    df = new_processed_dataset.df 
-    assert df.iloc[0,0] == "just_to_test/training/patient001/patient001_ED_processed.nii.gz"
-    assert df.iloc[6,0] == "just_to_test/training/patient002/patient002_ED_processed.nii.gz"
-    assert df.shape == (480,2)
-    
-def test_new_processed_dataset_shape(new_processed_dataset): 
-    img, gt = new_processed_dataset[0]
     assert img.size() == torch.Size([1, 10, 224, 224])
     assert gt.size() == torch.Size([3, 10, 224, 224])
     

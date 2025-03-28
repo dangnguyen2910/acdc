@@ -13,7 +13,7 @@ import torchvision.transforms.v2 as v2
 
 # from src.model.model import UNet3D, ResidualUNet3D
 from src.model.unet import UNet3D
-from src.dataset import ACDC, ACDCProcessed, JustToTest
+from src.dataset.acdc import ACDC
 from src.loss import DiceLoss3D
 from src.metrics import calculate_multiclass_dice
 
@@ -38,20 +38,21 @@ def cleanup():
 def train(rank, world_size): 
     setup(rank, world_size)
 
-    batch_size = 2
-    EPOCHS = 50
-    best_model_path = "model/unet3d_6.pth"
-    model_path = "model/unet3d_6.pth"
-    train_result_path = "train_result/train_result_6.csv"
+    batch_size = 4
+    EPOCHS = 90
+    best_model_path = "model/unet3d_7.pth"
+    model_path = "model/unet3d_8.pth"
+    train_result_path = "train_result/train_result_8.csv"
     min_loss = 0
     
 
-    train_dataset = JustToTest("just_to_test/training/", is_testset=False)
-    valid_dataset = JustToTest("just_to_test/validation/", is_testset=True)
+    train_dataset = ACDC("database/training/", is_testset=False)
+    valid_dataset = ACDC("database/validation/", is_testset=True)
 
     model = UNet3D().to(rank)
     
     if (os.path.exists(best_model_path)): 
+        print(f"Load model {best_model_path}")
         model.load_state_dict(torch.load(best_model_path))
         
     model = DDP(model, device_ids=[rank])
