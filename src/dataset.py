@@ -33,48 +33,59 @@ class ACDC(Dataset):
     def __getitem__(self, index):
         img_path = self.df.iloc[index, 0]
         gt_path = self.df.iloc[index, 1]
-        
-        img = self.resample_3d_image(img_path)
-        gt = self.resample_3d_image(gt_path)
 
+        obj_ids = torch.tensor([1,2,3]).to(torch.long)
+        
+        img = sitk.ReadImage(img_path)
+        gt = sitk.ReadImage(gt_path)
+        
         img = sitk.GetArrayFromImage(img)
         gt = sitk.GetArrayFromImage(gt)
 
         img = torch.tensor(img).unsqueeze(0)
         gt = torch.tensor(gt).unsqueeze(0)
+        gt = (gt == obj_ids[:,None,None,None])
         
-        
-        assert img.size(1) == gt.size(1)
         num_layers = img.size(1)
         
         transform = tio.Compose([
-            tio.RescaleIntensity(out_min_max=(0,1)),
+            tio.Resampling((1.25, 1.25, 10)), 
             tio.Resize((num_layers, 352,352)), 
-            tio.CropOrPad((10, 352, 352)),
-            tio.Crop((0,0,64,64,64,64))
+            # tio.CropOrPad((10, 352, 352)),
+            tio.Crop((0,0,64,64,64,64)), 
+            tio.ZNormalization()
         ])
         
         gt_transform = tio.Compose([
+            tio.Resample((1.25, 1.25, 10)), 
             tio.Resize((num_layers, 352,352)), 
-            tio.CropOrPad((10, 352, 352)),
+            # tio.CropOrPad((10, 352, 352)),
             tio.Crop((0,0,64,64,64,64))
         ])
         
+        augment = tio.Compose([
+            tio.RandomFlip(axes=(1,2)), 
+            tio.RandomElasticDeformation(max_displacement=1), 
+            tio.RandomMotion(translation=2, num_transforms=1), 
+            tio.RandomGamma()
+        ])
         
-        img = self.transform(img)
-        gt = self.gt_transform(gt).to(torch.long)
+        img = transform(img)
+        gt = gt_transform(gt).to(torch.long)
         
-        return img, gt
+        subject = tio.Subject(
+            image = tio.ScalarImage(tensor = img), 
+            mask = tio.LabelMap(tensor = gt)
+        )
+        
+        if (not self.is_testset): 
+            subject = augment(subject)
+        
+        return subject.image.tensor, subject.mask.tensor
 
 
     def __len__(self): 
         return self.df.shape[0]
-
-
-    def load_nifti_image(self, file_path):
-        img = nib.load(file_path)
-        data = img.get_fdata()
-        return data
 
 
     def make_dataframe(self): 
@@ -123,34 +134,6 @@ class ACDC(Dataset):
 
         return ed_frameId, es_frame_Id
 
-
-    def resample_3d_image(self, image_path, new_spacing=(1.25, 1.25, 10.0), interpolator=sitk.sitkLinear):
-        # Load image
-        image = sitk.ReadImage(image_path)
-
-        # Get original spacing and size
-        original_spacing = image.GetSpacing()
-        original_size = image.GetSize()
-
-        # Compute new size to preserve field of view
-        new_size = [
-            int(round(original_size[i] * (original_spacing[i] / new_spacing[i])))
-            for i in range(3)
-        ]
-
-        # Define resampling filter
-        resampler = sitk.ResampleImageFilter()
-        resampler.SetOutputSpacing(new_spacing)
-        resampler.SetSize(new_size)
-        resampler.SetInterpolator(interpolator)
-        resampler.SetOutputOrigin(image.GetOrigin())
-        resampler.SetOutputDirection(image.GetDirection())
-
-        # Apply resampling
-        resampled_image = resampler.Execute(image)
-        
-        return resampled_image
-
         
 class ACDCProcessed(ACDC): 
     """ 
@@ -163,8 +146,7 @@ class ACDCProcessed(ACDC):
     """
     
     def __init__(self, data_path, is_testset): 
-        self.is_testset = is_testset
-        super().__init__(data_path)
+        super().__init__(data_path, is_testset)
 
     def __getitem__(self, index):
         img_path = self.df.iloc[index, 0]
@@ -187,13 +169,13 @@ class ACDCProcessed(ACDC):
         transform = tio.Compose([
             tio.ZNormalization(),
             tio.Resize((num_layers, 352,352)), 
-            tio.CropOrPad((10, 352, 352)),
+            # tio.CropOrPad((10, 352, 352)),
             tio.Crop((0,0,64,64,64,64))
         ])
         
         gt_transform = tio.Compose([
             tio.Resize((num_layers, 352,352)), 
-            tio.CropOrPad((10, 352, 352)),
+            # tio.CropOrPad((10, 352, 352)),
             tio.Crop((0,0,64,64,64,64))
         ])
         
@@ -212,8 +194,8 @@ class ACDCProcessed(ACDC):
             mask = tio.LabelMap(tensor = gt)
         )
         
-        if (not self.is_testset): 
-            subject = augment(subject)
+        # if (not self.is_testset): 
+        #     subject = augment(subject)
         
         return subject.image.tensor, subject.mask.tensor
 
@@ -285,6 +267,8 @@ class JustToTest(ACDCProcessed):
         is_testset (bool): True if loading validation or test set    
     
     """
+    def __init__(self, data_path, is_testset): 
+        super().__init__(data_path, is_testset)
     
     def make_dataframe(self): 
         '''

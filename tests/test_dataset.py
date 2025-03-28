@@ -36,6 +36,21 @@ def test_processed_dataset_shape(processed_dataset):
     img, gt = processed_dataset[0]
     assert img.size() == torch.Size([1, 10, 224, 224])
     assert gt.size() == torch.Size([3, 10, 224, 224])
+@pytest.fixture
+def processed_dataset(): 
+    processed_dataset = ACDC("processed/training", is_testset=False)
+    return processed_dataset 
+
+def test_processed_dataset_make_dataframe(processed_dataset): 
+    df = processed_dataset.df 
+    assert df.iloc[0,0] == "processed/training/patient001/patient001_ED_processed.nii.gz"
+    assert df.iloc[6,0] == "processed/training/patient002/patient002_ED_processed.nii.gz"
+    assert df.shape == (480,2)
+    
+def test_processed_dataset_shape(processed_dataset): 
+    img, gt = processed_dataset[0]
+    assert img.size() == torch.Size([1, 10, 224, 224])
+    assert gt.size() == torch.Size([3, 10, 224, 224])
     
     
 @pytest.fixture
