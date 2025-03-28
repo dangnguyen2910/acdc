@@ -1,11 +1,29 @@
 import pytest 
 import torch
 
-from src.dataset import ACDCProcessed, JustToTest
+from src.dataset import ACDC, ACDCProcessed, JustToTest
+
+
+@pytest.fixture
+def dataset(): 
+    dataset = ACDC("database/training", is_testset=False)
+    return dataset 
+
+def test_dataset_make_dataframe(dataset): 
+    df = dataset.df 
+    assert df.iloc[0,0] == "database/training/patient001/patient001_ED_processed.nii.gz"
+    assert df.iloc[6,0] == "database/training/patient002/patient002_ED_processed.nii.gz"
+    assert df.shape == (480,2)
+    
+def test_dataset_shape(processed_dataset): 
+    img, gt = processed_dataset[0]
+    assert img.size() == torch.Size([1, 10, 224, 224])
+    assert gt.size() == torch.Size([3, 10, 224, 224])
+
 
 @pytest.fixture
 def processed_dataset(): 
-    processed_dataset = ACDCProcessed("processed/training", is_testset=False)
+    processed_dataset = ACDC("processed/training", is_testset=False)
     return processed_dataset 
 
 def test_processed_dataset_make_dataframe(processed_dataset): 

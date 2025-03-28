@@ -19,9 +19,10 @@ class ACDC(Dataset):
     Parameter: 
         data_path (string): path to training or testing set
     """
-    def __init__(self, data_path):
+    def __init__(self, data_path, is_testset):
         super().__init__()
         self.data_path = data_path
+        self.is_testset = is_testset
         self.patient_folders = [
             os.path.join(data_path, folder) for folder in os.listdir(data_path)
         ]
